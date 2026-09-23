@@ -99,7 +99,7 @@ class BaseCreateImageRequest:
         ms_delay: Additional delay before capture, in milliseconds.
         render_when_ready: Wait for ``ScreenshotReady()`` in page JavaScript.
         max_render_once: Ensure that the image is rendered and saved once.
-        disable_twemoji: Disable the Twemoji fallback renderer.
+        disable_twemoji: HTML/CSS images use Twemoji by default; True disables it. URL images inject Twemoji only with explicit False; None or True leaves the page unchanged.
         color_scheme: Emulate the ``light`` or ``dark`` color scheme.
         timezone: IANA timezone name used by the browser.
         viewport_mobile: Emulate a mobile viewport.
