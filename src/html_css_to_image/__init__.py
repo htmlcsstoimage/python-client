@@ -34,6 +34,9 @@ from .models import (
     RenderImageFormat,
     RenderImageOptions,
     RenderImageValueUnit,
+    RequestOverride,
+    RequestOverrideAction,
+    RequestOverrideResourceType,
     ValidationError,
 )
 
@@ -69,6 +72,9 @@ __all__ = [
     "RenderImageFormat",
     "RenderImageOptions",
     "RenderImageValueUnit",
+    "RequestOverride",
+    "RequestOverrideAction",
+    "RequestOverrideResourceType",
     "UnexpectedResponseError",
     "ValidationError",
     "__version__",

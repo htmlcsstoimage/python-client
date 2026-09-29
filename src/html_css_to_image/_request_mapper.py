@@ -15,6 +15,7 @@ from .models import (
     PDFOptions,
     PDFValueInput,
     PDFValueWithUnits,
+    RequestOverride,
 )
 
 
@@ -110,6 +111,10 @@ class RequestMapper:
         in_batch: bool,
     ) -> dict[str, Any]:
         payload = cls.common_payload(request, include_dedupe=not in_batch)
+        if request.request_overrides is not None:
+            payload["request_overrides"] = cls._map_request_overrides(
+                request.request_overrides
+            )
         payload["html"] = request.html or None if in_batch else request.html
         payload["css"] = request.css
 
@@ -132,6 +137,10 @@ class RequestMapper:
         in_batch: bool,
     ) -> dict[str, Any]:
         payload = cls.common_payload(request, include_dedupe=not in_batch)
+        if request.request_overrides is not None:
+            payload["request_overrides"] = cls._map_request_overrides(
+                request.request_overrides
+            )
         payload.update(
             {
                 "url": request.url or None if in_batch else request.url,
@@ -153,6 +162,20 @@ class RequestMapper:
             }
         )
         return cls.without_none(payload)
+
+    @staticmethod
+    def _map_request_overrides(rules: list[RequestOverride]) -> list[dict[str, Any]]:
+        return [
+            RequestMapper.without_none({
+                "action": rule.action.value,
+                "url": rule.url,
+                "resource_types": (
+                    [resource_type.value for resource_type in rule.resource_types]
+                    if rule.resource_types is not None else None
+                ),
+            })
+            for rule in rules
+        ]
 
     @classmethod
     def _map_pdf_options(

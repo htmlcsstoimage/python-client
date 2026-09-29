@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "html-css-to-image"
-version = "0.2.0"
+version = "0.3.0"
 description = "Official Python client for the HTML/CSS to Image API"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -26,6 +26,9 @@ from html_css_to_image import (
     RenderImageCropSize,
     RenderImageCropSpan,
     RenderImageOptions,
+    RequestOverride,
+    RequestOverrideAction,
+    RequestOverrideResourceType,
     UnexpectedResponseError,
     __version__,
 )
@@ -44,6 +47,32 @@ class HtmlCssToImageClientTests(unittest.TestCase):
             self.api_key,
             http_client=http_client,
         )
+
+    def test_request_overrides_serialize_enums_and_stay_out_of_signed_urls(self):
+        rules = [RequestOverride(
+            action=RequestOverrideAction.BLOCK,
+            url="*.js",
+            resource_types=[
+                RequestOverrideResourceType.SCRIPT,
+                RequestOverrideResourceType.FETCH,
+            ],
+        )]
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            payload = json.loads(request.content)
+            self.assertEqual(payload["request_overrides"], [{
+                "action": "block", "url": "*.js", "resource_types": ["script", "fetch"],
+            }])
+            return httpx.Response(200, json={"id": "123", "url": "image-url"})
+
+        client = self.make_client(handler)
+        client.create_image(
+            CreateUrlImageRequest(url="https://example.com", request_overrides=rules)
+        )
+        signed = client.generate_create_and_render_url(
+            CreateUrlImageRequest(url="https://example.com", request_overrides=rules)
+        )
+        self.assertNotIn("request_overrides", signed)
 
     def test_create_image_maps_html_css_fonts_pdf_and_auth(self):
         def handler(request: httpx.Request) -> httpx.Response:

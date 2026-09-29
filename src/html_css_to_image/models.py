@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Literal, TypeAlias
 
 ColorSchemeType: TypeAlias = Literal["light", "dark"]
@@ -13,6 +14,42 @@ RenderImageCropOrigin: TypeAlias = Literal["start", "center", "end"]
 ImageFormat: TypeAlias = Literal["png", "jpg", "webp", "pdf"]
 RenderImageFormat: TypeAlias = ImageFormat
 RenderImageValueUnit: TypeAlias = Literal["px", "%"]
+
+
+class RequestOverrideResourceType(str, Enum):
+    """Browser resource types supported by a request override rule."""
+
+    BEACON = "beacon"
+    DOCUMENT = "document"
+    STYLESHEET = "stylesheet"
+    IMAGE = "image"
+    IMAGE_SET = "image_set"
+    MEDIA = "media"
+    FONT = "font"
+    SCRIPT = "script"
+    TEXT_TRACK = "text_track"
+    XHR = "xhr"
+    FETCH = "fetch"
+    EVENT_SOURCE = "event_source"
+    MANIFEST = "manifest"
+    PING = "ping"
+    IMG = "img"
+    OTHER = "other"
+
+
+class RequestOverrideAction(str, Enum):
+    """Action applied to a matching browser request."""
+
+    BLOCK = "block"
+
+
+@dataclass(slots=True)
+class RequestOverride:
+    """Block requests matching a URL wildcard and/or resource types."""
+
+    action: RequestOverrideAction = RequestOverrideAction.BLOCK
+    url: str | None = None
+    resource_types: list[RequestOverrideResourceType] | None = None
 
 
 def _validate_string_collection(
@@ -99,7 +136,8 @@ class BaseCreateImageRequest:
         ms_delay: Additional delay before capture, in milliseconds.
         render_when_ready: Wait for ``ScreenshotReady()`` in page JavaScript.
         max_render_once: Ensure that the image is rendered and saved once.
-        disable_twemoji: HTML/CSS images use Twemoji by default; True disables it. URL images inject Twemoji only with explicit False; None or True leaves the page unchanged.
+        disable_twemoji: HTML/CSS images use Twemoji by default; True disables it.
+            URL images inject Twemoji only with explicit False.
         color_scheme: Emulate the ``light`` or ``dark`` color scheme.
         timezone: IANA timezone name used by the browser.
         viewport_mobile: Emulate a mobile viewport.
@@ -107,6 +145,7 @@ class BaseCreateImageRequest:
         viewport_landscape: Render the viewport in landscape orientation.
         media_type: Emulate ``print`` or ``screen`` CSS media.
         proxy_id: Organization proxy identifier used for rendering.
+        request_overrides: Browser network request block rules; paid plans only.
         jumbo_max_width: Maximum width for jumbo rendering.
         jumbo_max_height: Maximum height for jumbo rendering.
         dedupe_duration_s: Reuse a matching recently generated image for up
@@ -134,6 +173,7 @@ class BaseCreateImageRequest:
     viewport_landscape: bool | None = None
     media_type: MediaType | None = None
     proxy_id: str | None = None
+    request_overrides: list[RequestOverride] | None = None
     jumbo_max_width: int | None = None
     jumbo_max_height: int | None = None
     dedupe_duration_s: int | None = None
