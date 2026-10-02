@@ -23,6 +23,7 @@ from .models import (
     CreateUrlImageRequest,
     DeleteImageResponse,
     RenderImageOptions,
+    TemplatedBatchImageOptions,
 )
 
 _ClientT = TypeVar("_ClientT", bound="HtmlCssToImageClient")
@@ -163,6 +164,31 @@ class HtmlCssToImageClient:
                 default_options
             )
         response = self._transport.post("/v1/image/batch", payload)
+        return ResponseMapper.map_batch_response(response)
+
+    def create_templated_image_batch(
+        self,
+        variations: Sequence[TemplatedBatchImageOptions],
+        default_options: TemplatedBatchImageOptions | None = None,
+    ) -> CreateImageBatchResponse:
+        """Create a template batch with shared defaults and ordered results.
+
+        Merging and template resolution happen on the API. An empty variation
+        list succeeds locally. API errors use the existing batch response type.
+        """
+        if not variations:
+            return CreateImageBatchSuccessResponse(images=())
+        payload: dict[str, Any] = {
+            "variations": [
+                RequestMapper.map_templated_batch_options(item)
+                for item in variations
+            ],
+        }
+        if default_options is not None:
+            payload["default_options"] = RequestMapper.map_templated_batch_options(
+                default_options
+            )
+        response = self._transport.post("/v1/image/batch/templated", payload)
         return ResponseMapper.map_batch_response(response)
 
     def delete_image(self, image_id: str) -> DeleteImageResponse:

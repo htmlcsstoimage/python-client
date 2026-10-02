@@ -269,6 +269,21 @@ class CreateTemplatedImageRequest:
     format: ImageFormat | None = None
 
 
+@dataclass(slots=True, kw_only=True)
+class TemplatedBatchImageOptions:
+    """Shared defaults or one template batch variation.
+
+    Supplying template_id resets the inherited version. Objects in
+    template_values merge recursively; arrays, scalars and explicit None
+    values replace defaults. Omitted fields inherit defaults.
+    """
+
+    template_id: str | None = None
+    template_version: int | None = None
+    template_values: Mapping[str, Any] | None = None
+    format: ImageFormat | None = None
+
+
 CreateImageRequest: TypeAlias = (
     CreateHtmlCssImageRequest | CreateUrlImageRequest | CreateTemplatedImageRequest
 )

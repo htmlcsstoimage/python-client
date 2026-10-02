@@ -101,7 +101,7 @@ result = client.create_image_batch(
 )
 ```
 
-Only HTML/CSS and URL requests can be batched. Empty `html` or `url` values in variations are omitted so they can inherit from `default_options`. An empty variation list returns a successful empty result without sending an HTTP request. Options unsupported by the batch API, such as `dedupe_duration_s`, are not serialized. See the [batch API documentation](https://docs.htmlcsstoimage.com/getting-started/using-the-api/#batch-image-creation).
+`create_image_batch` accepts HTML/CSS and URL requests; use `create_templated_image_batch` for templates. Empty `html` or `url` values in variations are omitted so they can inherit from `default_options`. An empty variation list returns a successful empty result without sending an HTTP request. Options unsupported by the batch API, such as `dedupe_duration_s`, are not serialized. See the [batch API documentation](https://docs.htmlcsstoimage.com/getting-started/using-the-api/#batch-image-creation).
 
 ## Signed URLs
 
@@ -243,6 +243,7 @@ else:
 | `from_env(...)` | `HtmlCssToImageClient` | Reads credentials from the environment. |
 | `create_image(request)` | `CreateImageResponse` | Sends `POST /v1/image`. |
 | `create_image_batch(variations, default_options=None)` | `CreateImageBatchResponse` | Sends `POST /v1/image/batch`, unless the list is empty. |
+| `create_templated_image_batch(variations, default_options=None)` | `CreateImageBatchResponse` | Sends `POST /v1/image/batch/templated`, unless the list is empty. |
 | `delete_image(image_id)` | `DeleteImageResponse` | Sends `DELETE /v1/image/{id}`. |
 | `delete_image_batch(image_ids)` | `DeleteImageResponse` | Sends `DELETE /v1/image/batch`. |
 | `image_url(image_id, render_options=None)` | `str` | Builds an existing-image URL locally. |
@@ -268,3 +269,23 @@ python -m build
 ## License
 
 MIT
+
+## Templated image batches
+
+Create images from one or more templates with shared defaults and ordered variations:
+
+```python
+from html_css_to_image import TemplatedBatchImageOptions
+
+result = client.create_templated_image_batch(
+    [
+        TemplatedBatchImageOptions(template_values={"title": "First"}),
+        TemplatedBatchImageOptions(template_id="t-other", template_values={"title": "Second"}),
+    ],
+    TemplatedBatchImageOptions(template_id="t-card", template_version=3, format="webp"),
+)
+```
+
+Omitted fields inherit defaults. Supplying a template ID resets the inherited version; omit its version to use latest. Template value objects merge recursively on the API; arrays, scalars, and explicit null values replace defaults. Results preserve input order and identical images reuse existing assets. Each merged values object must be nonempty and satisfy its template's required variables.
+
+See the [API reference](https://docs.htmlcsstoimage.com/getting-started/using-the-api/#batch-templated-image-creation) for plan limits and examples.

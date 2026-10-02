@@ -37,6 +37,7 @@ from .models import (
     RequestOverride,
     RequestOverrideAction,
     RequestOverrideResourceType,
+    TemplatedBatchImageOptions,
     ValidationError,
 )
 
@@ -52,6 +53,7 @@ __all__ = [
     "CreateImageResponse",
     "CreateImageSuccessResponse",
     "CreateTemplatedImageRequest",
+    "TemplatedBatchImageOptions",
     "CreateUrlImageRequest",
     "DeleteImageResponse",
     "DeleteImageSuccessResponse",

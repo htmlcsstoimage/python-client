@@ -16,6 +16,7 @@ from .models import (
     PDFValueInput,
     PDFValueWithUnits,
     RequestOverride,
+    TemplatedBatchImageOptions,
 )
 
 
@@ -57,6 +58,22 @@ class RequestMapper:
         ):
             raise TypeError("Batch requests must contain HTML/CSS or URL requests")
         return cls.map_request(request, in_batch=True)
+
+    @classmethod
+    def map_templated_batch_options(
+        cls, request: TemplatedBatchImageOptions,
+    ) -> dict[str, Any]:
+        if not isinstance(request, TemplatedBatchImageOptions):
+            raise TypeError("Template batches require TemplatedBatchImageOptions")
+        return cls.without_none({
+            "template_id": request.template_id,
+            "template_version": request.template_version,
+            "template_values": (
+                dict(request.template_values)
+                if request.template_values is not None else None
+            ),
+            "format": request.format,
+        })
 
     @classmethod
     def common_payload(
