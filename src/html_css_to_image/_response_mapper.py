@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast, get_args
 
 import httpx
 
@@ -18,10 +18,98 @@ from .models import (
     DeleteImageSuccessResponse,
     ValidationError,
 )
+from .recordings import (
+    CreateRecordingResponse,
+    CreateRecordingSuccessResponse,
+    RecordingError,
+    RecordingStatus,
+    RecordingStatusResponse,
+    RecordingStatusSuccessResponse,
+)
+
+_KNOWN_RECORDING_STATUSES = frozenset(get_args(RecordingStatus))
 
 
 class ResponseMapper:
     """Create typed response models and reject malformed successful bodies."""
+
+    @classmethod
+    def map_recording_response(
+        cls, response: httpx.Response
+    ) -> CreateRecordingResponse:
+        """Map recording creation through the existing API error contract."""
+        if not response.is_success:
+            return cls._map_error_response(response)
+        data = cls._decode_success_object(response, "recording creation")
+        return CreateRecordingSuccessResponse(
+            id=cls._recording_string(data, "id", response),
+            status_url=cls._recording_string(data, "status_url", response),
+            recording_url=cls._recording_string(data, "recording_url", response),
+        )
+
+    @classmethod
+    def map_recording_status(cls, response: httpx.Response) -> RecordingStatusResponse:
+        """Map a single status fetch, including nonterminal HTTP 202 responses."""
+        if not response.is_success:
+            return cls._map_error_response(response)
+        data = cls._decode_success_object(response, "recording status")
+        try:
+            error = None
+            raw_error = data.get("error")
+            if raw_error is not None:
+                if not isinstance(raw_error, dict):
+                    raise TypeError("Expected a recording error object")
+                error = RecordingError(
+                    code=cls._recording_string(raw_error, "code", response),
+                    message=cls._recording_string(raw_error, "message", response),
+                    occurred_at=cls._recording_string(
+                        raw_error, "occurred_at", response
+                    ),
+                    retryable=raw_error["retryable"],
+                    action_path=raw_error.get("action_path"),
+                )
+            return RecordingStatusSuccessResponse(
+                id=cls._recording_string(data, "id", response),
+                recording_url=cls._recording_string(data, "recording_url", response),
+                status=cls._recording_status(data, response),
+                status_entered_at=cls._recording_string(
+                    data, "status_entered_at", response
+                ),
+                attempt_count=int(data["attempt_count"]),
+                stored_duration_ms=(
+                    int(data["stored_duration_ms"])
+                    if data.get("stored_duration_ms") is not None
+                    else None
+                ),
+                storage_destination_hcti_storage_disabled=data.get(
+                    "storage_destination_hcti_storage_disabled"
+                ),
+                error=error,
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise cls._unexpected(
+                response, "Malformed recording status response."
+            ) from exc
+
+    @classmethod
+    def _recording_status(
+        cls, data: Mapping[str, Any], response: httpx.Response
+    ) -> RecordingStatus:
+        status = cls._recording_string(data, "status", response)
+        if status not in _KNOWN_RECORDING_STATUSES:
+            return "unknown"
+        return cast(RecordingStatus, status)
+
+    @classmethod
+    def _recording_string(
+        cls, data: Mapping[str, Any], key: str, response: httpx.Response
+    ) -> str:
+        value = data.get(key)
+        if not isinstance(value, str) or not value:
+            raise cls._unexpected(
+                response, f"Recording response must contain a non-empty {key} string."
+            )
+        return value
 
     @classmethod
     def map_image_response(cls, response: httpx.Response) -> CreateImageResponse:

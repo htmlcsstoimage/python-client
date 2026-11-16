@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import fields, is_dataclass
+from enum import Enum
 from typing import Any
 
 from .models import (
@@ -18,10 +20,55 @@ from .models import (
     RequestOverride,
     TemplatedBatchImageOptions,
 )
+from .recordings import (
+    CreateHtmlCssRecordingRequest,
+    CreateRecordingRequest,
+    CreateUrlRecordingRequest,
+)
 
 
 class RequestMapper:
     """Serialize typed request models for HCTI API operations."""
+
+    @classmethod
+    def map_recording(cls, request: CreateRecordingRequest) -> dict[str, Any]:
+        """Serialize a recording without adding defaults or validating API options."""
+        if not isinstance(
+            request, (CreateHtmlCssRecordingRequest, CreateUrlRecordingRequest)
+        ):
+            raise TypeError(f"Unsupported request type: {type(request).__name__}")
+        payload: dict[str, Any] = cls._recording_value(request)
+        if isinstance(request, CreateHtmlCssRecordingRequest):
+            payload.pop("google_fonts", None)
+            fonts = cls._map_google_fonts(request.google_fonts)
+            if fonts is not None:
+                payload["google_fonts"] = fonts
+        return payload
+
+    @classmethod
+    def _recording_value(cls, value: Any) -> Any:
+        if isinstance(value, Enum):
+            return value.value
+        if is_dataclass(value) and not isinstance(value, type):
+            return {
+                item.name: cls._recording_value(getattr(value, item.name))
+                for item in fields(value)
+                if getattr(value, item.name) is not None
+            }
+        if isinstance(value, Mapping):
+            return {key: cls._recording_value(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [cls._recording_value(item) for item in value]
+        return value
+
+    @staticmethod
+    def _map_google_fonts(font_names: list[str] | tuple[str, ...] | None) -> str | None:
+        fonts: list[str] = []
+        for font in font_names or ():
+            processed = font.strip().replace(" ", "+")
+            if processed and processed not in fonts:
+                fonts.append(processed)
+        return "|".join(fonts) if fonts else None
 
     @classmethod
     def map_request(
@@ -61,19 +108,23 @@ class RequestMapper:
 
     @classmethod
     def map_templated_batch_options(
-        cls, request: TemplatedBatchImageOptions,
+        cls,
+        request: TemplatedBatchImageOptions,
     ) -> dict[str, Any]:
         if not isinstance(request, TemplatedBatchImageOptions):
             raise TypeError("Template batches require TemplatedBatchImageOptions")
-        return cls.without_none({
-            "template_id": request.template_id,
-            "template_version": request.template_version,
-            "template_values": (
-                dict(request.template_values)
-                if request.template_values is not None else None
-            ),
-            "format": request.format,
-        })
+        return cls.without_none(
+            {
+                "template_id": request.template_id,
+                "template_version": request.template_version,
+                "template_values": (
+                    dict(request.template_values)
+                    if request.template_values is not None
+                    else None
+                ),
+                "format": request.format,
+            }
+        )
 
     @classmethod
     def common_payload(
@@ -135,14 +186,9 @@ class RequestMapper:
         payload["html"] = request.html or None if in_batch else request.html
         payload["css"] = request.css
 
-        if request.google_fonts:
-            fonts: list[str] = []
-            for font in request.google_fonts:
-                processed = font.strip().replace(" ", "+")
-                if processed and processed not in fonts:
-                    fonts.append(processed)
-            if fonts:
-                payload["google_fonts"] = "|".join(fonts)
+        fonts = cls._map_google_fonts(request.google_fonts)
+        if fonts is not None:
+            payload["google_fonts"] = fonts
 
         return cls.without_none(payload)
 
@@ -183,14 +229,17 @@ class RequestMapper:
     @staticmethod
     def _map_request_overrides(rules: list[RequestOverride]) -> list[dict[str, Any]]:
         return [
-            RequestMapper.without_none({
-                "action": rule.action.value,
-                "url": rule.url,
-                "resource_types": (
-                    [resource_type.value for resource_type in rule.resource_types]
-                    if rule.resource_types is not None else None
-                ),
-            })
+            RequestMapper.without_none(
+                {
+                    "action": rule.action.value,
+                    "url": rule.url,
+                    "resource_types": (
+                        [resource_type.value for resource_type in rule.resource_types]
+                        if rule.resource_types is not None
+                        else None
+                    ),
+                }
+            )
             for rule in rules
         ]
 

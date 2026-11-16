@@ -103,6 +103,61 @@ result = client.create_image_batch(
 
 `create_image_batch` accepts HTML/CSS and URL requests; use `create_templated_image_batch` for templates. Empty `html` or `url` values in variations are omitted so they can inherit from `default_options`. An empty variation list returns a successful empty result without sending an HTTP request. Options unsupported by the batch API, such as `dedupe_duration_s`, are not serialized. See the [batch API documentation](https://docs.htmlcsstoimage.com/getting-started/using-the-api/#batch-image-creation).
 
+## Recordings
+
+Use `create_recording` with `CreateHtmlCssRecordingRequest` or `CreateUrlRecordingRequest` to record HTML/CSS or a public webpage as MP4, WebM, or GIF:
+
+```python
+from html_css_to_image import (
+    CreateHtmlCssRecordingRequest,
+    CreateUrlRecordingRequest,
+    RecordingOutputOptions,
+    RecordingSimpleScrollAction,
+)
+
+result = client.create_recording(CreateUrlRecordingRequest(
+    url="https://example.com",
+    duration_ms=10000,
+    viewport_width=1280,
+    viewport_height=720,
+    actions=[RecordingSimpleScrollAction()],
+    output=RecordingOutputOptions(format="mp4"),
+))
+if result.success:
+    print(result.recording_url)  # Embed or request directly; it waits until the recording is ready.
+else:
+    print(result.error)
+
+animation = client.create_recording(CreateHtmlCssRecordingRequest(
+    html="<h1>Hello</h1>",
+    css="@keyframes fade { from { opacity: 0; } to { opacity: 1; } } h1 { animation: fade 2s; }",
+    duration_ms=3000,
+    duration_mode="fixed",
+    output=RecordingOutputOptions(format="gif", scale=0.5),
+))
+```
+
+Both request types share browser settings, triggers, ordered actions, and output options. Actions and triggers are typed dataclasses, such as `RecordingClickAction(selector="#start")` and `RecordingElementVisibleTrigger(selector="#ready")`. For JavaScript actions, `if_error=None` fails on a script error; `if_error=[]` ignores errors. Empty branch lists are preserved in JSON.
+
+```python
+deleted = client.delete_recording("recording-id")
+batch_deleted = client.delete_recording_batch(["first-id", "second-id"])
+```
+
+Deletion returns a success response when accepted. `delete_recording_batch` accepts a list or tuple of strings; an empty list returns a successful result without sending an HTTP request. All recording methods return the existing `ApiErrorResponse` on API errors and propagate HTTPX transport failures.
+
+Optional settings use the API defaults. Recordings have no audio. Creation returns an ID, status URL, and recording URL. The `recording_url` can be embedded or requested directly; the request waits until the recording is ready, so checking status is optional.
+
+```python
+status = client.fetch_recording_status("recording-id")
+if status.success:
+    print(status.status)
+```
+
+`fetch_recording_status` makes one request. HTTP 200 and 202 both return status information; `ready`, `failed`, and `cancelled` are terminal states. An error can describe an earlier, retryable attempt. A successful status fetch can report a failed recording. A status the client does not recognize, such as one added in a newer API version, is reported as `unknown`.
+
+See the [recording guide](https://docs.htmlcsstoimage.com/getting-started/recordings/), [actions reference](https://docs.htmlcsstoimage.com/parameters/actions/), and [trigger reference](https://docs.htmlcsstoimage.com/parameters/trigger/) for the timeline, output options, and examples.
+
 ## Signed URLs
 
 The signed URL helpers perform no network request. They create the exact query string, sign it with HMAC-SHA256 using the API key, and return a URL that can be shared without exposing that key.
@@ -187,7 +242,7 @@ single = client.delete_image("image-id")
 batch = client.delete_image_batch(["image-id-1", "image-id-2"])
 ```
 
-Every successful `2xx` response maps to `DeleteImageSuccessResponse`. API errors use `ApiErrorResponse`, while network failures remain HTTPX exceptions.
+Every successful `2xx` response maps to `DeleteImageSuccessResponse`. `delete_image_batch` accepts a list or tuple of strings; an empty list returns a successful result without sending an HTTP request. API errors use `ApiErrorResponse`, while network failures remain HTTPX exceptions.
 
 ## HTTP configuration
 
@@ -245,11 +300,15 @@ else:
 | `create_image_batch(variations, default_options=None)` | `CreateImageBatchResponse` | Sends `POST /v1/image/batch`, unless the list is empty. |
 | `create_templated_image_batch(variations, default_options=None)` | `CreateImageBatchResponse` | Sends `POST /v1/image/batch/templated`, unless the list is empty. |
 | `delete_image(image_id)` | `DeleteImageResponse` | Sends `DELETE /v1/image/{id}`. |
-| `delete_image_batch(image_ids)` | `DeleteImageResponse` | Sends `DELETE /v1/image/batch`. |
+| `delete_image_batch(image_ids)` | `DeleteImageResponse` | Sends `DELETE /v1/image/batch`, unless the list is empty. |
 | `image_url(image_id, render_options=None)` | `str` | Builds an existing-image URL locally. |
 | `generate_templated_image_url(request, render_options=None)` | `str` | Builds and signs a template URL from a request locally. |
 | `generate_templated_image_url_from_values(...)` | `str` | Builds and signs a template URL from separate values locally. |
 | `generate_create_and_render_url(...)` | `str` | Builds and signs a URL screenshot locally. |
+| `create_recording(request)` | `CreateRecordingResponse` | Sends `POST /v1/recording`. |
+| `fetch_recording_status(recording_id)` | `RecordingStatusResponse` | Sends `GET /v1/recordings/{id}/status`. |
+| `delete_recording(recording_id)` | `DeleteRecordingResponse` | Sends `DELETE /v1/recordings/{id}`. |
+| `delete_recording_batch(recording_ids)` | `DeleteRecordingResponse` | Sends `DELETE /v1/recordings/batch`, unless the list is empty. |
 | `close()` | `None` | Closes only an SDK-owned HTTP client. |
 
 The package exports typed request, response, PDF, and render/crop models from `html_css_to_image`. Public classes, constructor parameters, attributes, and methods include docstrings for IDE help and generated API documentation.
