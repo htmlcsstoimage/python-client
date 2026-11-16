@@ -14,7 +14,6 @@ from html_css_to_image import (
     ApiErrorResponse,
     CreateHtmlCssImageRequest,
     CreateTemplatedImageRequest,
-    TemplatedBatchImageOptions,
     CreateUrlImageRequest,
     DeleteImageSuccessResponse,
     HtmlCssToImageClient,
@@ -30,6 +29,7 @@ from html_css_to_image import (
     RequestOverride,
     RequestOverrideAction,
     RequestOverrideResourceType,
+    TemplatedBatchImageOptions,
     UnexpectedResponseError,
     __version__,
 )
@@ -51,7 +51,9 @@ class HtmlCssToImageClientTests(unittest.TestCase):
 
     def test_template_batch_preserves_inheritance_and_nested_null(self):
         defaults = TemplatedBatchImageOptions(
-            template_id="t-card", template_version=3, format="webp",
+            template_id="t-card",
+            template_version=3,
+            format="webp",
             template_values={"brand": {"name": "Acme", "color": "red"}},
         )
         variation = TemplatedBatchImageOptions(
@@ -60,24 +62,46 @@ class HtmlCssToImageClientTests(unittest.TestCase):
         )
 
         def handler(request):
-            self.assertEqual(str(request.url), "https://hcti.io/v1/image/batch/templated")
+            self.assertEqual(
+                str(request.url), "https://hcti.io/v1/image/batch/templated"
+            )
             self.assertEqual(request.method, "POST")
-            self.assertEqual(json.loads(request.content), {
-                "default_options": {
-                    "template_id": "t-card", "template_version": 3, "format": "webp",
-                    "template_values": {"brand": {"name": "Acme", "color": "red"}},
+            self.assertEqual(
+                json.loads(request.content),
+                {
+                    "default_options": {
+                        "template_id": "t-card",
+                        "template_version": 3,
+                        "format": "webp",
+                        "template_values": {"brand": {"name": "Acme", "color": "red"}},
+                    },
+                    "variations": [
+                        {},
+                        {
+                            "template_id": "t-other",
+                            "template_values": {
+                                "brand": {"color": None},
+                                "tags": [],
+                                "active": False,
+                            },
+                        },
+                    ],
                 },
-                "variations": [{}, {
-                    "template_id": "t-other",
-                    "template_values": {"brand": {"color": None}, "tags": [], "active": False},
-                }],
-            })
-            return httpx.Response(200, json={"images": [
-                {"id": "two", "url": "two"}, {"id": "one", "url": "one"},
-            ]})
+            )
+            return httpx.Response(
+                200,
+                json={
+                    "images": [
+                        {"id": "two", "url": "two"},
+                        {"id": "one", "url": "one"},
+                    ]
+                },
+            )
 
         client = self.make_client(handler)
-        result = client.create_templated_image_batch([TemplatedBatchImageOptions(), variation], defaults)
+        result = client.create_templated_image_batch(
+            [TemplatedBatchImageOptions(), variation], defaults
+        )
         self.assertTrue(result.success)
         self.assertEqual([image.id for image in result.images], ["two", "one"])
         self.assertEqual(variation.template_version, None)
@@ -89,26 +113,34 @@ class HtmlCssToImageClientTests(unittest.TestCase):
         def handler(request):
             calls.append(request)
             self.assertNotIn("default_options", json.loads(request.content))
-            return httpx.Response(400, json={"error": "Bad Request", "message": "Invalid template"})
+            return httpx.Response(
+                400, json={"error": "Bad Request", "message": "Invalid template"}
+            )
 
         client = self.make_client(handler)
         self.assertTrue(client.create_templated_image_batch([]).success)
         self.assertEqual(calls, [])
-        result = client.create_templated_image_batch([TemplatedBatchImageOptions(template_id="t-missing")])
+        result = client.create_templated_image_batch(
+            [TemplatedBatchImageOptions(template_id="t-missing")]
+        )
         self.assertFalse(result.success)
         self.assertEqual(result.message, "Invalid template")
         with self.assertRaises(TypeError):
-            client.create_templated_image_batch([CreateUrlImageRequest(url="https://example.com")])
+            client.create_templated_image_batch(
+                [CreateUrlImageRequest(url="https://example.com")]
+            )
 
     def test_request_overrides_serialize_enums_and_stay_out_of_signed_urls(self):
-        rules = [RequestOverride(
-            action=RequestOverrideAction.BLOCK,
-            url="*.js",
-            resource_types=[
-                RequestOverrideResourceType.SCRIPT,
-                RequestOverrideResourceType.FETCH,
-            ],
-        )]
+        rules = [
+            RequestOverride(
+                action=RequestOverrideAction.BLOCK,
+                url="*.js",
+                resource_types=[
+                    RequestOverrideResourceType.SCRIPT,
+                    RequestOverrideResourceType.FETCH,
+                ],
+            )
+        ]
 
         def handler(request: httpx.Request) -> httpx.Response:
             payload = json.loads(request.content)
@@ -538,6 +570,14 @@ class HtmlCssToImageClientTests(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "image_ids"):
             client.delete_image_batch("image-id")
+
+    def test_empty_delete_batch_does_not_send_request(self):
+        def handler(_request: httpx.Request) -> httpx.Response:
+            self.fail("An empty batch must not send an HTTP request")
+
+        client = self.make_client(handler)
+        self.assertTrue(client.delete_image_batch([]).success)
+        self.assertTrue(client.delete_image_batch(()).success)
 
     def test_delete_image_and_batch(self):
         requests: list[httpx.Request] = []

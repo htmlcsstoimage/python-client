@@ -22,15 +22,23 @@ from .models import (
     CreateTemplatedImageRequest,
     CreateUrlImageRequest,
     DeleteImageResponse,
+    DeleteImageSuccessResponse,
     RenderImageOptions,
     TemplatedBatchImageOptions,
+)
+from .recordings import (
+    CreateRecordingRequest,
+    CreateRecordingResponse,
+    DeleteRecordingResponse,
+    DeleteRecordingSuccessResponse,
+    RecordingStatusResponse,
 )
 
 _ClientT = TypeVar("_ClientT", bound="HtmlCssToImageClient")
 
 
 class HtmlCssToImageClient:
-    """Client for creating images with the HTML/CSS to Image API.
+    """Client for creating images and recordings with the HTML/CSS to Image API.
 
     The client performs no automatic retries. To configure retry behavior,
     proxies, certificates, connection limits, or custom transports, construct
@@ -101,6 +109,59 @@ class HtmlCssToImageClient:
             base_url=base_url,
         )
 
+    def create_recording(
+        self, request: CreateRecordingRequest
+    ) -> CreateRecordingResponse:
+        """Record HTML/CSS or a public URL.
+
+        The returned recording_url can be embedded or requested directly; the
+        request waits until the recording is ready. Optional settings use API
+        defaults. API errors use ApiErrorResponse; network failures are raised
+        by HTTPX, as for create_image.
+        See https://docs.htmlcsstoimage.com/getting-started/recordings/.
+        """
+        payload = RequestMapper.map_recording(request)
+        return ResponseMapper.map_recording_response(
+            self._transport.post("/v1/recording", payload)
+        )
+
+    def fetch_recording_status(self, recording_id: str) -> RecordingStatusResponse:
+        """Fetch status once. HTTP 200 and 202 both return status information.
+
+        ready, failed, and cancelled are terminal states. An error can describe
+        an earlier, retryable attempt; inspect status for the current state.
+        """
+        return ResponseMapper.map_recording_status(
+            self._transport.get(f"/v1/recordings/{recording_id}/status")
+        )
+
+    def delete_recording(self, recording_id: str) -> DeleteRecordingResponse:
+        """Delete a recording and clear its media from the CDN."""
+        return ResponseMapper.map_delete_response(
+            self._transport.delete(f"/v1/recordings/{recording_id}")
+        )
+
+    def delete_recording_batch(
+        self, recording_ids: list[str] | tuple[str, ...]
+    ) -> DeleteRecordingResponse:
+        """Delete recording IDs in one API call. The API validates the options.
+
+        An empty list or tuple returns a successful response without making an
+        HTTP request.
+
+        Raises:
+            TypeError: If ``recording_ids`` is not a list or tuple of strings.
+        """
+        if not isinstance(recording_ids, (list, tuple)) or any(
+            not isinstance(recording_id, str) for recording_id in recording_ids
+        ):
+            raise TypeError("recording_ids must be a list or tuple of strings")
+        if not recording_ids:
+            return DeleteRecordingSuccessResponse()
+        return ResponseMapper.map_delete_response(
+            self._transport.delete("/v1/recordings/batch", {"ids": list(recording_ids)})
+        )
+
     def create_image(self, request: CreateImageRequest) -> CreateImageResponse:
         """Create an image from HTML/CSS, a URL, or a saved template.
 
@@ -155,8 +216,7 @@ class HtmlCssToImageClient:
 
         payload: dict[str, Any] = {
             "variations": [
-                RequestMapper.map_batch_request(variation)
-                for variation in variations
+                RequestMapper.map_batch_request(variation) for variation in variations
             ],
         }
         if default_options is not None:
@@ -180,8 +240,7 @@ class HtmlCssToImageClient:
             return CreateImageBatchSuccessResponse(images=())
         payload: dict[str, Any] = {
             "variations": [
-                RequestMapper.map_templated_batch_options(item)
-                for item in variations
+                RequestMapper.map_templated_batch_options(item) for item in variations
             ],
         }
         if default_options is not None:
@@ -214,6 +273,9 @@ class HtmlCssToImageClient:
     ) -> DeleteImageResponse:
         """Delete several generated images in one API call.
 
+        An empty list or tuple returns a successful response without making an
+        HTTP request.
+
         Args:
             image_ids: List or tuple of HCTI image identifiers to delete.
 
@@ -229,6 +291,8 @@ class HtmlCssToImageClient:
             not isinstance(image_id, str) for image_id in image_ids
         ):
             raise TypeError("image_ids must be a list or tuple of strings")
+        if not image_ids:
+            return DeleteImageSuccessResponse()
         response = self._transport.delete("/v1/image/batch", {"ids": list(image_ids)})
         return ResponseMapper.map_delete_response(response)
 

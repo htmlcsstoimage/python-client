@@ -31,6 +31,16 @@ class HttpTransport:
         credentials = base64.b64encode(f"{api_id}:{api_key}".encode()).decode()
         self._auth_header = f"Basic {credentials}"
 
+    def get(self, path: str) -> httpx.Response:
+        """Send an authenticated GET request."""
+        return self._http_client.get(
+            f"{self._base_url}{path}",
+            headers={
+                "Authorization": self._auth_header,
+                "User-Agent": _USER_AGENT,
+            },
+        )
+
     def post(self, path: str, payload: Mapping[str, Any]) -> httpx.Response:
         """Send a JSON POST request."""
 
