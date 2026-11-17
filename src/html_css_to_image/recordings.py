@@ -175,9 +175,9 @@ class RecordingSimpleScrollAction:
         scroll_duration_ms: Duration of each movement in milliseconds. Defaults to 800.
         ms_between_scrolls: Pause between movements in milliseconds. Defaults to 400; 0
             scrolls continuously.
-        scroll_distance: CSS pixels as a number, or a string such as '900px' or '90vh'.
-            Defaults to '90vh'.
-        easing: Movement easing. Defaults to ease_in_out_expo.
+        scroll_distance: CSS pixels as a number, or a string such as '900px' or '50vh'.
+            Omit or use None to use API defaults.
+        easing: Movement easing. Omit or use None to use API defaults.
         stall_at_end_ms: Time to hold at the bottom in milliseconds, limited by
             remaining recording time. Defaults to 0.
     """
