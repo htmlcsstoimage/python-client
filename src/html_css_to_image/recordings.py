@@ -22,6 +22,8 @@ from .models import (
 
 RecordingFormat: TypeAlias = Literal["mp4", "webm", "gif"]
 
+RecordingAudioEndBehavior: TypeAlias = Literal["silence", "loop", "trim_video"]
+
 RecordingDurationMode: TypeAlias = Literal["fixed", "target", "at_least", "at_most"]
 
 RecordingMouseButton: TypeAlias = Literal["left", "right", "middle", "back", "forward"]
@@ -295,6 +297,46 @@ class SelectorScrollTarget:
 
 
 @dataclass(slots=True, kw_only=True)
+class _RecordingAudioOptions:
+    """Playback options shared by both audio sources.
+
+    Attributes:
+        source_start_ms: Offset into the source file in milliseconds. Defaults to 0.
+        delay_ms: Delay from the start of the finished video in milliseconds.
+            Defaults to 0.
+        when_audio_ends: Keep playing silently (default), loop from the source offset,
+            or trim the video when the track ends.
+        error_on_source_invalid: Defaults to True. Set False to return the full
+            silent video if the track cannot play at render time.
+    """
+
+    source_start_ms: int | None = None
+    delay_ms: int | None = None
+    when_audio_ends: RecordingAudioEndBehavior | None = None
+    error_on_source_invalid: bool | None = None
+
+
+@dataclass(slots=True, kw_only=True)
+class RecordingAssetAudio(_RecordingAudioOptions):
+    """Use the asset_id of a completed audio upload from the recording organization.
+
+    Private Asset Library uploads are supported.
+    """
+
+    asset_id: str
+
+
+@dataclass(slots=True, kw_only=True)
+class RecordingUrlAudio(_RecordingAudioOptions):
+    """Use a public HTTP or HTTPS URL serving the audio file at render time."""
+
+    url: str
+
+
+RecordingAudio: TypeAlias = RecordingAssetAudio | RecordingUrlAudio
+
+
+@dataclass(slots=True, kw_only=True)
 class RecordingOutputOptions:
     """Output format, frame rate, and scaling for a recording.
 
@@ -394,8 +436,10 @@ class BaseCreateRecordingRequest:
             immediate. See https://docs.htmlcsstoimage.com/parameters/trigger/
         actions: Ordered interactions. Leave None or empty to record the page without
             interactions. See https://docs.htmlcsstoimage.com/parameters/actions/
-        output: Output format, frame rate, and scale. Defaults to MP4 at 30 fps without
-            audio. See https://docs.htmlcsstoimage.com/parameters/output/
+        audio: Optional MP4 or WebM soundtrack from an asset ID or public URL.
+            See https://docs.htmlcsstoimage.com/parameters/audio/
+        output: Output format, frame rate, and scale. Defaults to MP4 at 30 fps.
+            See https://docs.htmlcsstoimage.com/parameters/output/
         duration_mode: How duration_ms limits the timeline. Defaults to at_most. See
             https://docs.htmlcsstoimage.com/parameters/duration_mode/
         defer_render: Wait to render until media or storage is requested. Defaults to
@@ -424,6 +468,7 @@ class BaseCreateRecordingRequest:
     duration_ms: int
     trigger: RecordingTrigger | None = None
     actions: list[RecordingAction] | None = None
+    audio: RecordingAudio | None = None
     output: RecordingOutputOptions | None = None
     duration_mode: RecordingDurationMode | None = None
     defer_render: bool | None = None

@@ -14,6 +14,7 @@ from html_css_to_image import (
     CreateUrlRecordingRequest,
     HtmlCssToImageClient,
     PositionScrollTarget,
+    RecordingAssetAudio,
     RecordingClickAction,
     RecordingElementVisibleTrigger,
     RecordingErrorAction,
@@ -25,6 +26,7 @@ from html_css_to_image import (
     RecordingScrollAction,
     RecordingSimpleScrollAction,
     RecordingStallAction,
+    RecordingUrlAudio,
     RequestOverride,
     RequestOverrideResourceType,
     ScrollStep,
@@ -49,6 +51,7 @@ class RecordingTests(unittest.TestCase):
         request = CreateHtmlCssRecordingRequest(
             html="<h1>Hello</h1>",
             duration_ms=1000,
+            audio=RecordingAssetAudio(asset_id="asset_1"),
             google_fonts=[" Roboto ", "Open Sans", "Open Sans"],
         )
         before = copy.deepcopy(request)
@@ -62,6 +65,7 @@ class RecordingTests(unittest.TestCase):
                 json.loads(req.content),
                 {
                     "html": "<h1>Hello</h1>",
+                    "audio": {"asset_id": "asset_1"},
                     "duration_ms": 1000,
                     "google_fonts": "Roboto|Open+Sans",
                 },
@@ -79,6 +83,13 @@ class RecordingTests(unittest.TestCase):
         request = CreateUrlRecordingRequest(
             url="https://example.com",
             duration_ms=5000,
+            audio=RecordingUrlAudio(
+                url="https://cdn.example.com/audio/intro.mp3",
+                source_start_ms=0,
+                delay_ms=500,
+                when_audio_ends="trim_video",
+                error_on_source_invalid=False,
+            ),
             css="body { color: red; }",
             device_scale=2,
             viewport_width=1280,
@@ -172,6 +183,13 @@ class RecordingTests(unittest.TestCase):
                 "defer_render": False,
                 "skip_scroll_preload": True,
                 "duration_mode": "at_least",
+                "audio": {
+                    "url": "https://cdn.example.com/audio/intro.mp3",
+                    "source_start_ms": 0,
+                    "delay_ms": 500,
+                    "when_audio_ends": "trim_video",
+                    "error_on_source_invalid": False,
+                },
                 "headers": {"Authorization": "Bearer test"},
                 "include_headers_on_subrequests": False,
                 "identify_as_hcti": True,

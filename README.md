@@ -146,7 +146,9 @@ batch_deleted = client.delete_recording_batch(["first-id", "second-id"])
 
 Deletion returns a success response when accepted. `delete_recording_batch` accepts a list or tuple of strings; an empty list returns a successful result without sending an HTTP request. All recording methods return the existing `ApiErrorResponse` on API errors and propagate HTTPX transport failures.
 
-Optional settings use the API defaults. Recordings have no audio. Creation returns an ID, status URL, and recording URL. The `recording_url` can be embedded or requested directly; the request waits until the recording is ready, so checking status is optional.
+Optional settings use the API defaults. Creation returns an ID, status URL, and recording URL. The `recording_url` can be embedded or requested directly; the request waits until the recording is ready, so checking status is optional.
+
+For an MP4 or WebM soundtrack, import `RecordingAssetAudio` or `RecordingUrlAudio` from `html_css_to_image`. Pass `audio=RecordingAssetAudio(asset_id="YOUR_ASSET_ID", delay_ms=500)` or `audio=RecordingUrlAudio(url="https://cdn.example.com/audio/intro.mp3")` on either recording request. [Audio sources and playback options](https://docs.htmlcsstoimage.com/parameters/audio/).
 
 ```python
 status = client.fetch_recording_status("recording-id")
